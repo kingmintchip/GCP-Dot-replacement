@@ -99,18 +99,20 @@ async function fetchANU(n) {
   return j.data;
 }
 
-async function fetchNistBeacon(n) {
-  const url = `https://beacon.nist.gov/beacon/2.0/pulse/last?_=${Date.now()}`;
+const DRAND_QUICKNET = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
+
+async function fetchDrand(n) {
+  const url = `https://api.drand.sh/${DRAND_QUICKNET}/public/latest?_=${Date.now()}`;
   const r = await fetchViaProxy(url);
   const j = await r.json();
-  const hex = j?.pulse?.outputValue;
-  if (!hex) throw new Error('NIST beacon returned no data');
+  const hex = j?.randomness;
+  if (!hex) throw new Error('drand returned no data');
   const bytes = [];
   for (let i = 0; i < hex.length && bytes.length < n; i += 2) {
     bytes.push(parseInt(hex.substr(i, 2), 16));
   }
-  if (bytes.length === 0) throw new Error('NIST beacon parse failed');
-  return { bytes, pulseIndex: j.pulse.pulseIndex };
+  if (bytes.length === 0) throw new Error('drand parse failed');
+  return { bytes, round: j.round };
 }
 
 function bytesToZscores(bytes) {
@@ -257,11 +259,11 @@ async function run() {
 
   setSourceState('anu', 'loading', 'fetching…');
   setSourceState('hb', 'loading', 'fetching…');
-  log('→ starting fetch from ANU + NIST Beacon');
+  log('→ starting fetch from ANU + drand');
 
-  const [anuResult, nistResult] = await Promise.allSettled([
+  const [anuResult, drandResult] = await Promise.allSettled([
     fetchANU(SAMPLE_SIZE),
-    fetchNistBeacon(SAMPLE_SIZE),
+    fetchDrand(SAMPLE_SIZE),
   ]);
 
   const zArrays = [];
@@ -276,15 +278,15 @@ async function run() {
     log(`✗ ANU failed: ${anuResult.reason.message.slice(0, 50)}`);
   }
 
-  if (nistResult.status === 'fulfilled') {
-    const { bytes, pulseIndex } = nistResult.value;
+  if (drandResult.status === 'fulfilled') {
+    const { bytes, round } = drandResult.value;
     zArrays.push(bytesToZscores(bytes));
     const mean = (bytes.reduce((a, b) => a + b, 0) / bytes.length).toFixed(1);
-    setSourceState('hb', 'ok', `mean ${mean}/255 · ${bytes.length} bytes · pulse #${pulseIndex}`);
-    log(`✓ NIST ok · mean ${mean} · pulse #${pulseIndex}`);
+    setSourceState('hb', 'ok', `mean ${mean}/255 · ${bytes.length} bytes · round #${round}`);
+    log(`✓ drand ok · mean ${mean} · round #${round}`);
   } else {
-    setSourceState('hb', 'err', `unavailable: ${nistResult.reason.message.slice(0, 40)}`);
-    log(`✗ NIST failed: ${nistResult.reason.message.slice(0, 50)}`);
+    setSourceState('hb', 'err', `unavailable: ${drandResult.reason.message.slice(0, 40)}`);
+    log(`✗ drand failed: ${drandResult.reason.message.slice(0, 50)}`);
   }
 
   if (zArrays.length < 2) {

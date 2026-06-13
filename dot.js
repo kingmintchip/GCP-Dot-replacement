@@ -37,8 +37,8 @@ function setSourceState(key, state, detail) {
 }
 
 async function fetchANU(n) {
-  const url = `https://qrng.anu.edu.au/API/jsonI.php?length=${n}&type=uint8`;
-  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
+  const url = `https://qrng.anu.edu.au/API/jsonI.php?length=${n}&type=uint8&_=${Date.now()}`;
+  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = await r.json();
   if (!j.success || !j.data) throw new Error('ANU returned no data');
@@ -46,8 +46,8 @@ async function fetchANU(n) {
 }
 
 async function fetchHotBits(n) {
-  const url = `https://www.fourmilab.ch/cgi-bin/Hotbits?nbytes=${n}&fmt=json&apikey=Pseudorandom`;
-  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000) });
+  const url = `https://www.fourmilab.ch/cgi-bin/Hotbits?nbytes=${n}&fmt=json&apikey=Pseudorandom&_=${Date.now()}`;
+  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = await r.json();
   if (!j.data) throw new Error('HotBits returned no data');

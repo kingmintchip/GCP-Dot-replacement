@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consciousness Dot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=IBM+Plex+Sans:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <span class="wordmark">consciousness dot</span>
+    <span class="subtitle">an independent replication</span>
+  </header>
+
+  <main>
+    <div class="dot-stage">
+      <div class="ring ring-3" id="ring3"></div>
+      <div class="ring ring-2" id="ring2"></div>
+      <div class="ring ring-1" id="ring1"></div>
+      <div class="dot" id="dot"></div>
+    </div>
+
+    <div class="readout">
+      <div class="readout-primary" id="status-text">initializing</div>
+      <div class="readout-secondary" id="index-text">sampling quantum sources</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-val" id="stat-p">—</div>
+        <div class="stat-lbl">p-value</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val" id="stat-z">—</div>
+        <div class="stat-lbl">network Z</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val" id="stat-n">—</div>
+        <div class="stat-lbl">samples</div>
+      </div>
+    </div>
+
+    <div class="sources">
+      <div class="source" id="src-anu">
+        <div class="source-indicator" id="ind-anu"></div>
+        <div class="source-info">
+          <div class="source-name">ANU Quantum RNG</div>
+          <div class="source-detail" id="detail-anu">quantum vacuum fluctuations · Australia</div>
+        </div>
+      </div>
+      <div class="source" id="src-hb">
+        <div class="source-indicator" id="ind-hb"></div>
+        <div class="source-info">
+          <div class="source-name">HotBits</div>
+          <div class="source-detail" id="detail-hb">radioactive decay · fourmilab.ch</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="sample-btn" id="sample-btn" onclick="run()">sample now</button>
+    <div class="timestamp" id="timestamp"></div>
+  </main>
+
+  <footer>
+    <div class="legend">
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#2176d9"></span>
+        <span>deeply coherent <em>p &gt; 0.95</em></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#3ea87a"></span>
+        <span>slightly coherent <em>p 0.90–0.95</em></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#9a9a8e"></span>
+        <span>normal / random <em>p 0.40–0.90</em></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#c9a820"></span>
+        <span>slightly elevated <em>p 0.10–0.40</em></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#d06820"></span>
+        <span>strongly elevated <em>p 0.05–0.10</em></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch" style="background:#c43030"></span>
+        <span>broadly coherent <em>p &lt; 0.05</em></span>
+      </div>
+    </div>
+    <p class="footer-note">
+      Sources: <a href="https://qrng.anu.edu.au" target="_blank" rel="noopener">ANU QRNG</a> ·
+      <a href="https://www.fourmilab.ch/hotbits/" target="_blank" rel="noopener">HotBits</a> ·
+      inspired by the <a href="https://global-mind.org" target="_blank" rel="noopener">Global Consciousness Project</a>
+    </p>
+  </footer>
+
+  <script src="dot.js"></script>
+</body>
+</html>

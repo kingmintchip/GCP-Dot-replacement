@@ -169,6 +169,10 @@ main {
   .sources { grid-template-columns: 1fr; }
 }
 
+.source:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .source {
   display: flex;
   align-items: center;

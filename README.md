@@ -4,14 +4,13 @@ An independent replication of the [Global Consciousness Project Dot](https://glo
 
 ## How it works
 
-Every 60 seconds the page fetches random bytes from four independent public entropy sources:
+Every 60 seconds the page fetches random bytes from three independent public entropy sources:
 
 - **[ANU Quantum RNG](https://qrng.anu.edu.au)** — quantum vacuum fluctuations, Australian National University
 - **[drand quicknet](https://drand.love)** — League of Entropy distributed beacon, fresh round every 3 seconds
 - **[drand default chain](https://drand.love)** — League of Entropy distributed beacon, fresh round every 30 seconds
-- **[random.org](https://www.random.org)** — atmospheric noise
 
-It then runs the same core statistic the GCP uses — **network variance** (Stouffer Z) — measuring how much the sources correlate with each other rather than drifting independently, across all 6 pairwise combinations. The result is mapped to a p-value and displayed as a colored dot.
+It then runs the same core statistic the GCP uses — **network variance** (Stouffer Z) — measuring how much the sources correlate with each other rather than drifting independently, across all 3 pairwise combinations. The result is mapped to a p-value and displayed as a colored dot.
 
 | Color | Meaning | p-value |
 |-------|---------|---------|
@@ -26,7 +25,9 @@ The dot itself uses a continuous color gradient anchored to these same threshold
 
 ## Caveats
 
-With 4 sources and 64 bytes per sample, the statistics are still much noisier than the real GCP (which uses 65+ eggs and decades of data). The dot will jump around more. This is a faithful architectural replication, not a scientific equivalent. If any source is temporarily unavailable, the calculation proceeds with whichever sources succeeded (minimum 2 required).
+With 3 sources and 64 bytes per sample (32 for the drand chains), the statistics are still much noisier than the real GCP (which uses 65+ eggs and decades of data). The dot will jump around more. This is a faithful architectural replication, not a scientific equivalent. If any source is temporarily unavailable, the calculation proceeds with whichever sources succeeded (minimum 2 required).
+
+Note on random.org: an earlier version included random.org as a fourth source, but its free API enforces a per-IP quota that gets exhausted quickly when accessed through shared public CORS proxies, causing persistent 429 errors. It was removed rather than requiring users to supply their own API key.
 
 ## CORS proxies
 

@@ -31,25 +31,6 @@ async function fetchJsonViaProxy(url) {
   throw lastErr || new Error('all proxies failed');
 }
 
-// Fetch raw text (for random.org's plain-text integer endpoint), with the
-// same proxy fallback chain.
-async function fetchTextViaProxy(url) {
-  let lastErr;
-  for (const proxy of PROXIES) {
-    try {
-      const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(10000), cache: 'no-store' });
-      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
-      const text = await r.text();
-      if (!text.trim()) { lastErr = new Error('empty response'); continue; }
-      return text;
-    } catch (e) {
-      lastErr = e;
-      continue;
-    }
-  }
-  throw lastErr || new Error('all proxies failed');
-}
-
 const COLORS = {
   blue:   { hex: '#2176d9', label: 'deeply coherent',   desc: 'index > 95% — rare strong signal' },
   green:  { hex: '#3ea87a', label: 'slightly coherent', desc: 'index 90–95%' },
@@ -142,14 +123,6 @@ async function fetchDrand(n) {
 
 async function fetchDrandDefault(n) {
   return fetchDrandChain(DRAND_DEFAULT, n);
-}
-
-async function fetchRandomOrg(n) {
-  const url = `https://www.random.org/integers/?num=${n}&min=0&max=255&col=1&base=10&format=plain&rnd=new&_=${Date.now()}`;
-  const text = await fetchTextViaProxy(url);
-  const nums = text.trim().split('\n').map(Number).filter(v => !isNaN(v));
-  if (nums.length === 0) throw new Error('random.org returned no data');
-  return nums;
 }
 
 function bytesToZscores(bytes) {
@@ -298,11 +271,10 @@ async function run() {
     { key: 'anu', label: 'ANU ok', fetch: () => fetchANU(SAMPLE_SIZE), info: bytes => `${bytes.length} bytes · quantum vacuum` },
     { key: 'drand-q', label: 'drand-quicknet ok', fetch: () => fetchDrand(SAMPLE_SIZE), info: (bytes, extra) => `${bytes.length} bytes · round #${extra.round}` },
     { key: 'drand-d', label: 'drand-default ok', fetch: () => fetchDrandDefault(SAMPLE_SIZE), info: (bytes, extra) => `${bytes.length} bytes · round #${extra.round}` },
-    { key: 'random-org', label: 'random.org ok', fetch: () => fetchRandomOrg(SAMPLE_SIZE), info: bytes => `${bytes.length} bytes · atmospheric noise` },
   ];
 
   sources.forEach(s => setSourceState(s.key, 'loading', 'fetching…'));
-  log('→ starting fetch from 4 sources');
+  log('→ starting fetch from 3 sources');
 
   const results = await Promise.allSettled(sources.map(s => s.fetch()));
 
@@ -329,7 +301,7 @@ async function run() {
     $('index-text').textContent = 'need at least 2 sources online to compute coherence';
     $('stat-p').textContent = '—';
     $('stat-z').textContent = '—';
-    $('stat-n').textContent = `${zArrays.length}/4 online`;
+    $('stat-n').textContent = `${zArrays.length}/3 online`;
     btn.disabled = false;
     return;
   }

@@ -45,13 +45,14 @@ async function fetchANU(n) {
   return j.data;
 }
 
-async function fetchHotBits(n) {
-  const url = `https://www.fourmilab.ch/cgi-bin/Hotbits?nbytes=${n}&fmt=json&apikey=Pseudorandom&_=${Date.now()}`;
+async function fetchRandomOrg(n) {
+  const url = `https://www.random.org/integers/?num=${n}&min=0&max=255&col=1&base=10&format=plain&rnd=new`;
   const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const j = await r.json();
-  if (!j.data) throw new Error('HotBits returned no data');
-  return j.data;
+  const text = await r.text();
+  const nums = text.trim().split('\n').map(Number).filter(n => !isNaN(n));
+  if (nums.length === 0) throw new Error('random.org returned no data');
+  return nums;
 }
 
 function bytesToZscores(bytes) {
@@ -93,11 +94,104 @@ function normCDF(z) {
 let timer = null;
 const logs = [];
 
+// History: store up to 24hrs of 1-min samples = 1440 points
+const MAX_HISTORY = 1440;
+const history = []; // {ts, p} objects
+
 function log(msg) {
   const t = new Date().toLocaleTimeString();
   logs.unshift(`${t} ${msg}`);
   if (logs.length > 8) logs.pop();
   $('debug-log').textContent = logs.join('\n');
+}
+
+function pToHex(p) {
+  if (p > 0.95) return '#2176d9';
+  if (p > 0.90) return '#3ea87a';
+  if (p > 0.40) return '#9a9a8e';
+  if (p > 0.10) return '#c9a820';
+  if (p > 0.05) return '#d06820';
+  return '#c43030';
+}
+
+function drawChart() {
+  const canvas = $('history-chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 120 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = 120;
+  const PAD = 4;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // background
+  ctx.fillStyle = '#13131a';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, 8);
+  ctx.fill();
+
+  // threshold lines
+  const thresholds = [
+    { p: 0.95, color: 'rgba(33,118,217,0.15)' },
+    { p: 0.90, color: 'rgba(62,168,122,0.15)' },
+    { p: 0.10, color: 'rgba(201,168,32,0.15)' },
+    { p: 0.05, color: 'rgba(196,48,48,0.15)' },
+  ];
+  thresholds.forEach(({ p, color }) => {
+    const y = PAD + (1 - p) * (H - PAD * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  if (history.length < 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.font = '11px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('building history…', W / 2, H / 2);
+    return;
+  }
+
+  // draw colored line segments
+  for (let i = 1; i < history.length; i++) {
+    const x1 = PAD + ((i - 1) / (MAX_HISTORY - 1)) * (W - PAD * 2);
+    const x2 = PAD + (i / (MAX_HISTORY - 1)) * (W - PAD * 2);
+    const y1 = PAD + (1 - history[i - 1].p) * (H - PAD * 2);
+    const y2 = PAD + (1 - history[i].p) * (H - PAD * 2);
+
+    ctx.strokeStyle = pToHex(history[i].p);
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // dot at latest point
+  const last = history[history.length - 1];
+  const lx = PAD + ((history.length - 1) / (MAX_HISTORY - 1)) * (W - PAD * 2);
+  const ly = PAD + (1 - last.p) * (H - PAD * 2);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = pToHex(last.p);
+  ctx.fill();
+
+  // update time label
+  if (history.length > 0) {
+    const oldest = new Date(history[0].ts);
+    $('chart-time-start').textContent = oldest.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
 }
 
 async function run() {
@@ -108,11 +202,11 @@ async function run() {
 
   setSourceState('anu', 'loading', 'fetching…');
   setSourceState('hb', 'loading', 'fetching…');
-  log('→ starting fetch from ANU + HotBits');
+  log('→ starting fetch from ANU + random.org');
 
   const [anuResult, hbResult] = await Promise.allSettled([
     fetchANU(SAMPLE_SIZE),
-    fetchHotBits(SAMPLE_SIZE),
+    fetchRandomOrg(SAMPLE_SIZE),
   ]);
 
   const zArrays = [];
@@ -161,6 +255,11 @@ async function run() {
   $('stat-z').textContent = stoufferZ.toFixed(3);
   $('stat-n').textContent = `${len} bytes`;
 
+  // record to history and redraw chart
+  history.push({ ts: Date.now(), p });
+  if (history.length > MAX_HISTORY) history.shift();
+  drawChart();
+
   const now = new Date();
   $('timestamp').textContent = `last sampled ${now.toLocaleTimeString()} · next in 60s`;
 
@@ -170,4 +269,7 @@ async function run() {
   timer = setInterval(run, INTERVAL_MS);
 }
 
-window.addEventListener('DOMContentLoaded', run);
+window.addEventListener('DOMContentLoaded', () => {
+  drawChart();
+  run();
+});

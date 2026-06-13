@@ -45,6 +45,19 @@
       </div>
     </div>
 
+    <div class="chart-wrap">
+      <div class="chart-labels">
+        <span>p=1</span>
+        <span>p=0.5</span>
+        <span>p=0</span>
+      </div>
+      <canvas id="history-chart" height="120"></canvas>
+      <div class="chart-time-labels">
+        <span id="chart-time-start"></span>
+        <span>now</span>
+      </div>
+    </div>
+
     <div class="sources">
       <div class="source" id="src-anu">
         <div class="source-indicator" id="ind-anu"></div>
@@ -56,8 +69,8 @@
       <div class="source" id="src-hb">
         <div class="source-indicator" id="ind-hb"></div>
         <div class="source-info">
-          <div class="source-name">HotBits</div>
-          <div class="source-detail" id="detail-hb">radioactive decay · fourmilab.ch</div>
+          <div class="source-name">random.org</div>
+          <div class="source-detail" id="detail-hb">atmospheric noise · random.org</div>
         </div>
       </div>
     </div>
@@ -96,7 +109,7 @@
     </div>
     <p class="footer-note">
       Sources: <a href="https://qrng.anu.edu.au" target="_blank" rel="noopener">ANU QRNG</a> ·
-      <a href="https://www.fourmilab.ch/hotbits/" target="_blank" rel="noopener">HotBits</a> ·
+      <a href="https://www.random.org" target="_blank" rel="noopener">random.org</a> ·
       inspired by the <a href="https://global-mind.org" target="_blank" rel="noopener">Global Consciousness Project</a>
     </p>
   </footer>

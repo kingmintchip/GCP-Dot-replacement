@@ -46,7 +46,7 @@ async function fetchANU(n) {
 }
 
 async function fetchNistBeacon(n) {
-  const url = `https://beacon.nist.gov/beacon/2.0/pulse/last`;
+  const url = `https://beacon.nist.gov/beacon/2.0/pulse/last?_=${Date.now()}`;
   const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = await r.json();

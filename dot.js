@@ -119,12 +119,14 @@ function drawChart() {
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
+  const cssHeight = 120;
+  canvas.style.height = cssHeight + 'px';
   canvas.width = rect.width * dpr;
-  canvas.height = 120 * dpr;
+  canvas.height = cssHeight * dpr;
   ctx.scale(dpr, dpr);
 
   const W = rect.width;
-  const H = 120;
+  const H = cssHeight;
   const PAD = 4;
 
   ctx.clearRect(0, 0, W, H);

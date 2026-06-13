@@ -22,6 +22,37 @@ function pToColor(p) {
   return 'red';
 }
 
+// Continuous color gradient anchored to the same thresholds as COLORS,
+// so the dot's hue drifts smoothly with every sample instead of jumping
+// between 6 discrete buckets.
+const GRADIENT_STOPS = [
+  { p: 0.00, rgb: [196, 48, 48] },   // red
+  { p: 0.05, rgb: [208, 104, 32] },  // orange
+  { p: 0.10, rgb: [201, 168, 32] },  // yellow
+  { p: 0.40, rgb: [180, 170, 90] },  // yellow-gray
+  { p: 0.65, rgb: [154, 154, 142] }, // gray (center of normal band)
+  { p: 0.90, rgb: [110, 165, 130] }, // green-gray
+  { p: 0.95, rgb: [62, 168, 122] },  // green
+  { p: 1.00, rgb: [33, 118, 217] },  // blue
+];
+
+function pToRgb(p) {
+  p = Math.max(0, Math.min(1, p));
+  for (let i = 0; i < GRADIENT_STOPS.length - 1; i++) {
+    const a = GRADIENT_STOPS[i], b = GRADIENT_STOPS[i + 1];
+    if (p >= a.p && p <= b.p) {
+      const t = (p - a.p) / (b.p - a.p || 1);
+      return a.rgb.map((v, idx) => Math.round(v + (b.rgb[idx] - v) * t));
+    }
+  }
+  return GRADIENT_STOPS[GRADIENT_STOPS.length - 1].rgb;
+}
+
+function pToGradientHex(p) {
+  const [r, g, b] = pToRgb(p);
+  return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
 const $ = id => document.getElementById(id);
 
 function setDotColor(hex) {
@@ -111,12 +142,7 @@ function log(msg) {
 }
 
 function pToHex(p) {
-  if (p > 0.95) return '#2176d9';
-  if (p > 0.90) return '#3ea87a';
-  if (p > 0.40) return '#9a9a8e';
-  if (p > 0.10) return '#c9a820';
-  if (p > 0.05) return '#d06820';
-  return '#c43030';
+  return pToGradientHex(p);
 }
 
 function drawChart() {
@@ -256,7 +282,7 @@ async function run() {
   const colorKey = pToColor(p);
   const c = COLORS[colorKey];
 
-  setDotColor(c.hex);
+  setDotColor(pToGradientHex(p));
   $('status-text').textContent = c.label;
   $('index-text').textContent = c.desc;
   $('stat-p').textContent = p.toFixed(4);

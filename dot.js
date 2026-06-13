@@ -45,14 +45,19 @@ async function fetchANU(n) {
   return j.data;
 }
 
-async function fetchRandomOrg(n) {
-  const url = `https://www.random.org/integers/?num=${n}&min=0&max=255&col=1&base=10&format=plain&rnd=new`;
+async function fetchNistBeacon(n) {
+  const url = `https://beacon.nist.gov/beacon/2.0/pulse/last`;
   const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const text = await r.text();
-  const nums = text.trim().split('\n').map(Number).filter(n => !isNaN(n));
-  if (nums.length === 0) throw new Error('random.org returned no data');
-  return nums;
+  const j = await r.json();
+  const hex = j?.pulse?.outputValue;
+  if (!hex) throw new Error('NIST beacon returned no data');
+  const bytes = [];
+  for (let i = 0; i < hex.length && bytes.length < n; i += 2) {
+    bytes.push(parseInt(hex.substr(i, 2), 16));
+  }
+  if (bytes.length === 0) throw new Error('NIST beacon parse failed');
+  return { bytes, pulseIndex: j.pulse.pulseIndex };
 }
 
 function bytesToZscores(bytes) {
@@ -204,11 +209,11 @@ async function run() {
 
   setSourceState('anu', 'loading', 'fetching…');
   setSourceState('hb', 'loading', 'fetching…');
-  log('→ starting fetch from ANU + random.org');
+  log('→ starting fetch from ANU + NIST Beacon');
 
-  const [anuResult, hbResult] = await Promise.allSettled([
+  const [anuResult, nistResult] = await Promise.allSettled([
     fetchANU(SAMPLE_SIZE),
-    fetchRandomOrg(SAMPLE_SIZE),
+    fetchNistBeacon(SAMPLE_SIZE),
   ]);
 
   const zArrays = [];
@@ -223,14 +228,15 @@ async function run() {
     log(`✗ ANU failed: ${anuResult.reason.message.slice(0, 50)}`);
   }
 
-  if (hbResult.status === 'fulfilled') {
-    zArrays.push(bytesToZscores(hbResult.value));
-    const mean = (hbResult.value.reduce((a, b) => a + b, 0) / hbResult.value.length).toFixed(1);
-    setSourceState('hb', 'ok', `mean ${mean}/255 · ${hbResult.value.length} bytes · radioactive decay`);
-    log(`✓ HotBits ok · mean ${mean}`);
+  if (nistResult.status === 'fulfilled') {
+    const { bytes, pulseIndex } = nistResult.value;
+    zArrays.push(bytesToZscores(bytes));
+    const mean = (bytes.reduce((a, b) => a + b, 0) / bytes.length).toFixed(1);
+    setSourceState('hb', 'ok', `mean ${mean}/255 · ${bytes.length} bytes · pulse #${pulseIndex}`);
+    log(`✓ NIST ok · mean ${mean} · pulse #${pulseIndex}`);
   } else {
-    setSourceState('hb', 'err', `unavailable: ${hbResult.reason.message.slice(0, 40)}`);
-    log(`✗ HotBits failed: ${hbResult.reason.message.slice(0, 50)}`);
+    setSourceState('hb', 'err', `unavailable: ${nistResult.reason.message.slice(0, 40)}`);
+    log(`✗ NIST failed: ${nistResult.reason.message.slice(0, 50)}`);
   }
 
   if (zArrays.length < 2) {

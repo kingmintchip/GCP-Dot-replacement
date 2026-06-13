@@ -1,8 +1,32 @@
 'use strict';
 
-const PROXY = 'https://corsproxy.io/?url=';
+const PROXY = 'https://api.allorigins.win/raw?url=';
 const SAMPLE_SIZE = 64;
 const INTERVAL_MS = 60000;
+
+// Fetch through the CORS proxy with one retry on transient failures
+// (timeouts, 5xx, rate limits). A single blip shouldn't surface as an error.
+async function fetchViaProxy(url, retries = 1) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
+      if (!r.ok) {
+        if (attempt < retries && (r.status === 429 || r.status >= 500)) {
+          await new Promise(res => setTimeout(res, 1500));
+          continue;
+        }
+        throw new Error(`HTTP ${r.status}`);
+      }
+      return r;
+    } catch (e) {
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, 1500));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 
 const COLORS = {
   blue:   { hex: '#2176d9', label: 'deeply coherent',   desc: 'index > 95% — rare strong signal' },
@@ -69,8 +93,7 @@ function setSourceState(key, state, detail) {
 
 async function fetchANU(n) {
   const url = `https://qrng.anu.edu.au/API/jsonI.php?length=${n}&type=uint8&_=${Date.now()}`;
-  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const r = await fetchViaProxy(url);
   const j = await r.json();
   if (!j.success || !j.data) throw new Error('ANU returned no data');
   return j.data;
@@ -78,8 +101,7 @@ async function fetchANU(n) {
 
 async function fetchNistBeacon(n) {
   const url = `https://beacon.nist.gov/beacon/2.0/pulse/last?_=${Date.now()}`;
-  const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const r = await fetchViaProxy(url);
   const j = await r.json();
   const hex = j?.pulse?.outputValue;
   if (!hex) throw new Error('NIST beacon returned no data');

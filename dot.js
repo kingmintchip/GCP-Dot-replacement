@@ -32,35 +32,36 @@ async function fetchJsonViaProxy(url) {
 }
 
 const COLORS = {
-  blue:   { hex: '#2176d9', label: 'deeply coherent',   desc: 'index > 95% — rare strong signal' },
-  green:  { hex: '#3ea87a', label: 'slightly coherent', desc: 'index 90–95%' },
-  white:  { hex: '#9a9a8e', label: 'normal / random',   desc: 'index 40–90% — expected behavior' },
-  yellow: { hex: '#c9a820', label: 'slightly elevated', desc: 'index 10–40%' },
-  orange: { hex: '#d06820', label: 'strongly elevated', desc: 'index 5–10%' },
-  red:    { hex: '#c43030', label: 'broadly coherent',  desc: 'index < 5% — widely shared coherence' },
+  blue:   { hex: '#3b7ddd', label: 'deeply coherent',   desc: 'index > 95% — rare strong signal' },
+  cyan:   { hex: '#4fd1d9', label: 'slightly coherent', desc: 'index 90–95%' },
+  green:  { hex: '#4caf50', label: 'normal / random',   desc: 'index 40–90% — expected behavior' },
+  yellow: { hex: '#f0c419', label: 'slightly elevated', desc: 'index 10–40%' },
+  orange: { hex: '#f08a24', label: 'strongly elevated', desc: 'index 5–10%' },
+  red:    { hex: '#e0473e', label: 'broadly coherent',  desc: 'index < 5% — widely shared coherence' },
 };
 
 function pToColor(p) {
   if (p > 0.95) return 'blue';
-  if (p > 0.90) return 'green';
-  if (p > 0.40) return 'white';
+  if (p > 0.90) return 'cyan';
+  if (p > 0.40) return 'green';
   if (p > 0.10) return 'yellow';
   if (p > 0.05) return 'orange';
   return 'red';
 }
 
 // Continuous color gradient anchored to the same thresholds as COLORS,
-// so the dot's hue drifts smoothly with every sample instead of jumping
-// between 6 discrete buckets.
+// following the original GCP dot's red→orange→yellow→green→cyan→blue
+// spectrum (green = normal, not gray) so the dot stays lively even in
+// the common case.
 const GRADIENT_STOPS = [
-  { p: 0.00, rgb: [196, 48, 48] },   // red
-  { p: 0.05, rgb: [208, 104, 32] },  // orange
-  { p: 0.10, rgb: [201, 168, 32] },  // yellow
-  { p: 0.40, rgb: [180, 170, 90] },  // yellow-gray
-  { p: 0.65, rgb: [154, 154, 142] }, // gray (center of normal band)
-  { p: 0.90, rgb: [110, 165, 130] }, // green-gray
-  { p: 0.95, rgb: [62, 168, 122] },  // green
-  { p: 1.00, rgb: [33, 118, 217] },  // blue
+  { p: 0.00, rgb: [224, 71, 62] },   // red
+  { p: 0.05, rgb: [240, 138, 36] },  // orange
+  { p: 0.10, rgb: [240, 196, 25] },  // yellow
+  { p: 0.40, rgb: [150, 190, 60] },  // yellow-green
+  { p: 0.65, rgb: [76, 175, 80] },   // green (center of normal band)
+  { p: 0.90, rgb: [70, 190, 160] },  // green-cyan
+  { p: 0.95, rgb: [79, 209, 217] },  // cyan
+  { p: 1.00, rgb: [59, 125, 221] },  // blue
 ];
 
 function pToRgb(p) {
@@ -204,10 +205,10 @@ function drawChart() {
 
   // threshold lines
   const thresholds = [
-    { p: 0.95, color: 'rgba(33,118,217,0.15)' },
-    { p: 0.90, color: 'rgba(62,168,122,0.15)' },
-    { p: 0.10, color: 'rgba(201,168,32,0.15)' },
-    { p: 0.05, color: 'rgba(196,48,48,0.15)' },
+    { p: 0.95, color: 'rgba(59,125,221,0.15)' },
+    { p: 0.90, color: 'rgba(79,209,217,0.15)' },
+    { p: 0.10, color: 'rgba(240,196,25,0.15)' },
+    { p: 0.05, color: 'rgba(240,138,36,0.15)' },
   ];
   thresholds.forEach(({ p, color }) => {
     const y = PAD + (1 - p) * (H - PAD * 2);

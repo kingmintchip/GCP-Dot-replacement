@@ -6,7 +6,7 @@
   <title>Consciousness Dot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=IBM+Plex+Sans:wght@300;400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -66,11 +66,25 @@
           <div class="source-detail" id="detail-anu">quantum vacuum fluctuations · Australia</div>
         </div>
       </div>
-      <div class="source" id="src-hb">
-        <div class="source-indicator" id="ind-hb"></div>
+      <div class="source" id="src-drand-q">
+        <div class="source-indicator" id="ind-drand-q"></div>
         <div class="source-info">
-          <div class="source-name">drand (League of Entropy)</div>
-          <div class="source-detail" id="detail-hb">distributed randomness beacon · 3s rounds</div>
+          <div class="source-name">drand quicknet</div>
+          <div class="source-detail" id="detail-drand-q">League of Entropy · 3s rounds</div>
+        </div>
+      </div>
+      <div class="source" id="src-drand-d">
+        <div class="source-indicator" id="ind-drand-d"></div>
+        <div class="source-info">
+          <div class="source-name">drand default</div>
+          <div class="source-detail" id="detail-drand-d">League of Entropy · 30s rounds</div>
+        </div>
+      </div>
+      <div class="source" id="src-random-org">
+        <div class="source-indicator" id="ind-random-org"></div>
+        <div class="source-info">
+          <div class="source-name">random.org</div>
+          <div class="source-detail" id="detail-random-org">atmospheric noise</div>
         </div>
       </div>
     </div>
@@ -110,10 +124,11 @@
     <p class="footer-note">
       Sources: <a href="https://qrng.anu.edu.au" target="_blank" rel="noopener">ANU QRNG</a> ·
       <a href="https://drand.love" target="_blank" rel="noopener">drand</a> ·
+      <a href="https://www.random.org" target="_blank" rel="noopener">random.org</a> ·
       inspired by the <a href="https://global-mind.org" target="_blank" rel="noopener">Global Consciousness Project</a>
     </p>
   </footer>
 
-  <script src="dot.js?v=8"></script>
+  <script src="dot.js?v=9"></script>
 </body>
 </html>

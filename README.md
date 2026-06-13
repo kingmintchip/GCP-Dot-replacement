@@ -1,15 +1,17 @@
 # consciousness dot
 
-An independent replication of the [Global Consciousness Project Dot](https://global-mind.org/gcpdot/), built with public quantum random number generator APIs.
+An independent replication of the [Global Consciousness Project Dot](https://global-mind.org/gcpdot/), built with public random number generator APIs.
 
 ## How it works
 
-Every 60 seconds the page fetches random bytes from two independent hardware entropy sources:
+Every 60 seconds the page fetches random bytes from four independent public entropy sources:
 
 - **[ANU Quantum RNG](https://qrng.anu.edu.au)** — quantum vacuum fluctuations, Australian National University
-- **[HotBits](https://www.fourmilab.ch/hotbits/)** — radioactive decay, fourmilab.ch
+- **[drand quicknet](https://drand.love)** — League of Entropy distributed beacon, fresh round every 3 seconds
+- **[drand default chain](https://drand.love)** — League of Entropy distributed beacon, fresh round every 30 seconds
+- **[random.org](https://www.random.org)** — atmospheric noise
 
-It then runs the same core statistic the GCP uses — **network variance** (Stouffer Z) — measuring how much the two sources correlate with each other rather than drifting independently. The result is mapped to a p-value and displayed as a colored dot.
+It then runs the same core statistic the GCP uses — **network variance** (Stouffer Z) — measuring how much the sources correlate with each other rather than drifting independently, across all 6 pairwise combinations. The result is mapped to a p-value and displayed as a colored dot.
 
 | Color | Meaning | p-value |
 |-------|---------|---------|
@@ -20,37 +22,28 @@ It then runs the same core statistic the GCP uses — **network variance** (Stou
 | 🟠 Orange | Strongly elevated | 0.05–0.10 |
 | 🔴 Red | Broadly coherent | < 0.05 |
 
+The dot itself uses a continuous color gradient anchored to these same thresholds, so it shifts hue smoothly with every sample rather than jumping between 6 discrete colors.
+
 ## Caveats
 
-With only 2 sources and 64 bytes per sample, the statistics are much noisier than the real GCP (which uses 65+ eggs and decades of data). The dot will jump around more. This is a faithful architectural replication, not a scientific equivalent.
+With 4 sources and 64 bytes per sample, the statistics are still much noisier than the real GCP (which uses 65+ eggs and decades of data). The dot will jump around more. This is a faithful architectural replication, not a scientific equivalent. If any source is temporarily unavailable, the calculation proceeds with whichever sources succeeded (minimum 2 required).
+
+## CORS proxies
+
+Since these APIs don't allow direct browser requests, fetches go through a chain of public CORS proxies (`allorigins.win`, `codetabs.com`, `corsproxy.io`). If one proxy is down, rate-limited, or returns a bad response, the code automatically falls through to the next.
 
 ## Hosting on GitHub Pages
 
 1. Push this repo to GitHub
 2. Go to **Settings → Pages**
-3. Set source to `main` branch, `/ (root)`
+3. Set source to **Deploy from a branch** → `main` branch, `/ (root)`
 4. Your dot will be live at `https://yourusername.github.io/repo-name`
 
 No build step, no dependencies, no server needed.
 
-## Adding more sources
+## Cache busting
 
-To add random.org as a third source (requires a free API key):
-
-```js
-async function fetchRandomOrg(n, apiKey) {
-  const r = await fetch('https://api.random.org/json-rpc/4/invoke', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', method: 'generateIntegers', id: 1,
-      params: { apiKey, n, min: 0, max: 255, replacement: true }
-    })
-  });
-  const j = await r.json();
-  return j.result.random.data;
-}
-```
+`index.html` references `dot.js?v=N` and `style.css?v=N`. Bump the `N` whenever either file changes, so browsers and GitHub Pages' CDN don't serve a stale cached copy.
 
 ## Credits
 

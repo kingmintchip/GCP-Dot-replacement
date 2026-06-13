@@ -1,31 +1,53 @@
 'use strict';
 
-const PROXY = 'https://api.allorigins.win/raw?url=';
+const PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://corsproxy.io/?url=',
+];
 const SAMPLE_SIZE = 64;
 const INTERVAL_MS = 60000;
 
-// Fetch through the CORS proxy with one retry on transient failures
-// (timeouts, 5xx, rate limits). A single blip shouldn't surface as an error.
-async function fetchViaProxy(url, retries = 1) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
+// Fetch JSON through a chain of CORS proxies. If one proxy is down, rate
+// limited, or returns a non-JSON error page, fall through to the next.
+async function fetchJsonViaProxy(url) {
+  let lastErr;
+  for (const proxy of PROXIES) {
     try {
-      const r = await fetch(PROXY + encodeURIComponent(url), { signal: AbortSignal.timeout(12000), cache: 'no-store' });
-      if (!r.ok) {
-        if (attempt < retries && (r.status === 429 || r.status >= 500)) {
-          await new Promise(res => setTimeout(res, 1500));
-          continue;
-        }
-        throw new Error(`HTTP ${r.status}`);
-      }
-      return r;
-    } catch (e) {
-      if (attempt < retries) {
-        await new Promise(res => setTimeout(res, 1500));
+      const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(10000), cache: 'no-store' });
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      const text = await r.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        lastErr = new Error('invalid JSON from proxy');
         continue;
       }
-      throw e;
+    } catch (e) {
+      lastErr = e;
+      continue;
     }
   }
+  throw lastErr || new Error('all proxies failed');
+}
+
+// Fetch raw text (for random.org's plain-text integer endpoint), with the
+// same proxy fallback chain.
+async function fetchTextViaProxy(url) {
+  let lastErr;
+  for (const proxy of PROXIES) {
+    try {
+      const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(10000), cache: 'no-store' });
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      const text = await r.text();
+      if (!text.trim()) { lastErr = new Error('empty response'); continue; }
+      return text;
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+  throw lastErr || new Error('all proxies failed');
 }
 
 const COLORS = {
@@ -93,18 +115,17 @@ function setSourceState(key, state, detail) {
 
 async function fetchANU(n) {
   const url = `https://qrng.anu.edu.au/API/jsonI.php?length=${n}&type=uint8&_=${Date.now()}`;
-  const r = await fetchViaProxy(url);
-  const j = await r.json();
+  const j = await fetchJsonViaProxy(url);
   if (!j.success || !j.data) throw new Error('ANU returned no data');
   return j.data;
 }
 
 const DRAND_QUICKNET = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
+const DRAND_DEFAULT = '8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce';
 
-async function fetchDrand(n) {
-  const url = `https://api.drand.sh/${DRAND_QUICKNET}/public/latest?_=${Date.now()}`;
-  const r = await fetchViaProxy(url);
-  const j = await r.json();
+async function fetchDrandChain(chainHash, n) {
+  const url = `https://api.drand.sh/${chainHash}/public/latest?_=${Date.now()}`;
+  const j = await fetchJsonViaProxy(url);
   const hex = j?.randomness;
   if (!hex) throw new Error('drand returned no data');
   const bytes = [];
@@ -113,6 +134,22 @@ async function fetchDrand(n) {
   }
   if (bytes.length === 0) throw new Error('drand parse failed');
   return { bytes, round: j.round };
+}
+
+async function fetchDrand(n) {
+  return fetchDrandChain(DRAND_QUICKNET, n);
+}
+
+async function fetchDrandDefault(n) {
+  return fetchDrandChain(DRAND_DEFAULT, n);
+}
+
+async function fetchRandomOrg(n) {
+  const url = `https://www.random.org/integers/?num=${n}&min=0&max=255&col=1&base=10&format=plain&rnd=new&_=${Date.now()}`;
+  const text = await fetchTextViaProxy(url);
+  const nums = text.trim().split('\n').map(Number).filter(v => !isNaN(v));
+  if (nums.length === 0) throw new Error('random.org returned no data');
+  return nums;
 }
 
 function bytesToZscores(bytes) {
@@ -257,44 +294,42 @@ async function run() {
   $('status-text').textContent = 'sampling…';
   $('index-text').textContent = 'querying quantum sources';
 
-  setSourceState('anu', 'loading', 'fetching…');
-  setSourceState('hb', 'loading', 'fetching…');
-  log('→ starting fetch from ANU + drand');
+  const sources = [
+    { key: 'anu', label: 'ANU ok', fetch: () => fetchANU(SAMPLE_SIZE), info: bytes => `${bytes.length} bytes · quantum vacuum` },
+    { key: 'drand-q', label: 'drand-quicknet ok', fetch: () => fetchDrand(SAMPLE_SIZE), info: (bytes, extra) => `${bytes.length} bytes · round #${extra.round}` },
+    { key: 'drand-d', label: 'drand-default ok', fetch: () => fetchDrandDefault(SAMPLE_SIZE), info: (bytes, extra) => `${bytes.length} bytes · round #${extra.round}` },
+    { key: 'random-org', label: 'random.org ok', fetch: () => fetchRandomOrg(SAMPLE_SIZE), info: bytes => `${bytes.length} bytes · atmospheric noise` },
+  ];
 
-  const [anuResult, drandResult] = await Promise.allSettled([
-    fetchANU(SAMPLE_SIZE),
-    fetchDrand(SAMPLE_SIZE),
-  ]);
+  sources.forEach(s => setSourceState(s.key, 'loading', 'fetching…'));
+  log('→ starting fetch from 4 sources');
+
+  const results = await Promise.allSettled(sources.map(s => s.fetch()));
 
   const zArrays = [];
 
-  if (anuResult.status === 'fulfilled') {
-    zArrays.push(bytesToZscores(anuResult.value));
-    const mean = (anuResult.value.reduce((a, b) => a + b, 0) / anuResult.value.length).toFixed(1);
-    setSourceState('anu', 'ok', `mean ${mean}/255 · ${anuResult.value.length} bytes · quantum vacuum`);
-    log(`✓ ANU ok · mean ${mean}`);
-  } else {
-    setSourceState('anu', 'err', `unavailable: ${anuResult.reason.message.slice(0, 40)}`);
-    log(`✗ ANU failed: ${anuResult.reason.message.slice(0, 50)}`);
-  }
-
-  if (drandResult.status === 'fulfilled') {
-    const { bytes, round } = drandResult.value;
-    zArrays.push(bytesToZscores(bytes));
-    const mean = (bytes.reduce((a, b) => a + b, 0) / bytes.length).toFixed(1);
-    setSourceState('hb', 'ok', `mean ${mean}/255 · ${bytes.length} bytes · round #${round}`);
-    log(`✓ drand ok · mean ${mean} · round #${round}`);
-  } else {
-    setSourceState('hb', 'err', `unavailable: ${drandResult.reason.message.slice(0, 40)}`);
-    log(`✗ drand failed: ${drandResult.reason.message.slice(0, 50)}`);
-  }
+  results.forEach((result, i) => {
+    const s = sources[i];
+    if (result.status === 'fulfilled') {
+      const value = result.value;
+      const bytes = Array.isArray(value) ? value : value.bytes;
+      zArrays.push(bytesToZscores(bytes));
+      const mean = (bytes.reduce((a, b) => a + b, 0) / bytes.length).toFixed(1);
+      const extra = Array.isArray(value) ? {} : value;
+      setSourceState(s.key, 'ok', `mean ${mean}/255 · ${s.info(bytes, extra)}`);
+      log(`✓ ${s.label} · mean ${mean}`);
+    } else {
+      setSourceState(s.key, 'err', `unavailable: ${result.reason.message.slice(0, 40)}`);
+      log(`✗ ${s.key} failed: ${result.reason.message.slice(0, 50)}`);
+    }
+  });
 
   if (zArrays.length < 2) {
     $('status-text').textContent = 'insufficient sources';
     $('index-text').textContent = 'need at least 2 sources online to compute coherence';
     $('stat-p').textContent = '—';
     $('stat-z').textContent = '—';
-    $('stat-n').textContent = `${zArrays.length}/2 online`;
+    $('stat-n').textContent = `${zArrays.length}/4 online`;
     btn.disabled = false;
     return;
   }

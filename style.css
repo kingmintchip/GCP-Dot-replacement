@@ -225,6 +225,16 @@ main {
   min-height: 16px;
 }
 
+.debug-log {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 100%;
+  max-width: 480px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
 footer {
   width: 100%;
   max-width: 480px;

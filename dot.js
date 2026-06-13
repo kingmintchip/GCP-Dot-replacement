@@ -91,6 +91,14 @@ function normCDF(z) {
 }
 
 let timer = null;
+const logs = [];
+
+function log(msg) {
+  const t = new Date().toLocaleTimeString();
+  logs.unshift(`${t} ${msg}`);
+  if (logs.length > 8) logs.pop();
+  $('debug-log').textContent = logs.join('\n');
+}
 
 async function run() {
   const btn = $('sample-btn');
@@ -100,6 +108,7 @@ async function run() {
 
   setSourceState('anu', 'loading', 'fetching…');
   setSourceState('hb', 'loading', 'fetching…');
+  log('→ starting fetch from ANU + HotBits');
 
   const [anuResult, hbResult] = await Promise.allSettled([
     fetchANU(SAMPLE_SIZE),
@@ -112,16 +121,20 @@ async function run() {
     zArrays.push(bytesToZscores(anuResult.value));
     const mean = (anuResult.value.reduce((a, b) => a + b, 0) / anuResult.value.length).toFixed(1);
     setSourceState('anu', 'ok', `mean ${mean}/255 · ${anuResult.value.length} bytes · quantum vacuum`);
+    log(`✓ ANU ok · mean ${mean}`);
   } else {
     setSourceState('anu', 'err', `unavailable: ${anuResult.reason.message.slice(0, 40)}`);
+    log(`✗ ANU failed: ${anuResult.reason.message.slice(0, 50)}`);
   }
 
   if (hbResult.status === 'fulfilled') {
     zArrays.push(bytesToZscores(hbResult.value));
     const mean = (hbResult.value.reduce((a, b) => a + b, 0) / hbResult.value.length).toFixed(1);
     setSourceState('hb', 'ok', `mean ${mean}/255 · ${hbResult.value.length} bytes · radioactive decay`);
+    log(`✓ HotBits ok · mean ${mean}`);
   } else {
     setSourceState('hb', 'err', `unavailable: ${hbResult.reason.message.slice(0, 40)}`);
+    log(`✗ HotBits failed: ${hbResult.reason.message.slice(0, 50)}`);
   }
 
   if (zArrays.length < 2) {

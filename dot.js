@@ -8,9 +8,20 @@ const PROXIES = [
 const SAMPLE_SIZE = 64;
 const INTERVAL_MS = 60000;
 
-// Fetch JSON through a chain of CORS proxies. If one proxy is down, rate
-// limited, or returns a non-JSON error page, fall through to the next.
+// Fetch JSON, trying a direct request first (some public APIs serve
+// permissive CORS headers, letting us skip proxies entirely for those
+// sources — fewer hops, and avoids security software flagging repeated
+// calls to generic proxy domains). Falls back to the proxy chain if the
+// direct request fails (CORS block, network error, non-JSON, etc).
 async function fetchJsonViaProxy(url) {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000), cache: 'no-store' });
+    if (r.ok) {
+      const text = await r.text();
+      try { return JSON.parse(text); } catch { /* fall through */ }
+    }
+  } catch { /* CORS or network error — fall through */ }
+
   let lastErr;
   for (const proxy of PROXIES) {
     try {
@@ -308,8 +319,11 @@ async function run() {
   }
 
   const { stoufferZ, len } = networkVariance(zArrays);
-  const pOneTail = normCDF(stoufferZ);
-  const p = stoufferZ >= 0 ? pOneTail : 1 - pOneTail;
+  // Probability-integral transform of the network Stouffer Z. Under random
+  // data this is ~uniform on [0,1], so the dot roams the full red↔blue
+  // spectrum. (Do NOT fold negatives back above 0.5 — that pins p in
+  // [0.5,1.0] and makes the entire yellow/orange/red half unreachable.)
+  const p = normCDF(stoufferZ);
 
   const colorKey = pToColor(p);
   const c = COLORS[colorKey];

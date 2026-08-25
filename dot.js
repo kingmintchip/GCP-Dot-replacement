@@ -8,6 +8,22 @@ const PROXIES = [
 const SAMPLE_SIZE = 64;
 const INTERVAL_MS = 60000;
 
+// Rolling smoothing window: the displayed p-value is derived from the
+// average of the last N raw per-tick network Stouffer Z values, not the
+// single most recent one. This mirrors the original GCP dot, which showed
+// squared Stouffer Z deviations smoothed over a ~1-minute window rather
+// than raw per-second readings — smoothing is what the original design
+// used to avoid a jumpy, low-signal display, per GCP's own event-based
+// methodology (cumulative deviation over a window, not single trials).
+// Our sampling interval is already 60s (constrained by ANU's 1 req/min
+// limit), so a window of 5 samples ≈ 5 minutes of smoothing.
+//
+// Note: this reduces THIS poller's own variance/noise. It does NOT
+// synchronize this site's reading with any other independent poller
+// (e.g. the Discord bot's /dot-status) — two independent smoothed
+// readings will still disagree, just less wildly than two raw ones.
+const SMOOTH_WINDOW = 5;
+
 // Fetch JSON, trying a direct request first (some public APIs serve
 // permissive CORS headers, letting us skip proxies entirely for those
 // sources — fewer hops, and avoids security software flagging repeated
@@ -176,6 +192,18 @@ function normCDF(z) {
 let timer = null;
 const logs = [];
 
+// Rolling buffer of raw per-tick network Stouffer Z values, most recent
+// last. Trimmed to SMOOTH_WINDOW entries; averaging this buffer is what
+// produces the smoothed Z that actually drives the dot's displayed color.
+const zHistory = [];
+
+function pushSmoothedZ(rawZ) {
+  zHistory.push(rawZ);
+  if (zHistory.length > SMOOTH_WINDOW) zHistory.shift();
+  const sum = zHistory.reduce((a, b) => a + b, 0);
+  return sum / zHistory.length;
+}
+
 // History: store up to 24hrs of 1-min samples = 1440 points
 const MAX_HISTORY = 1440;
 const history = []; // {ts, p} objects
@@ -319,11 +347,15 @@ async function run() {
   }
 
   const { stoufferZ, len } = networkVariance(zArrays);
-  // Probability-integral transform of the network Stouffer Z. Under random
-  // data this is ~uniform on [0,1], so the dot roams the full red↔blue
-  // spectrum. (Do NOT fold negatives back above 0.5 — that pins p in
-  // [0.5,1.0] and makes the entire yellow/orange/red half unreachable.)
-  const p = normCDF(stoufferZ);
+  // Smooth the raw per-tick Stouffer Z over the trailing window before
+  // converting to a probability — see SMOOTH_WINDOW comment above.
+  const smoothZ = pushSmoothedZ(stoufferZ);
+  // Probability-integral transform of the (smoothed) network Stouffer Z.
+  // Under random data this is ~uniform on [0,1], so the dot roams the full
+  // red↔blue spectrum. (Do NOT fold negatives back above 0.5 — that pins p
+  // in [0.5,1.0] and makes the entire yellow/orange/red half unreachable.)
+  const p = normCDF(smoothZ);
+  const rawP = normCDF(stoufferZ);
 
   const colorKey = pToColor(p);
   const c = COLORS[colorKey];
@@ -332,8 +364,9 @@ async function run() {
   $('status-text').textContent = c.label;
   $('index-text').textContent = c.desc;
   $('stat-p').textContent = p.toFixed(4);
-  $('stat-z').textContent = stoufferZ.toFixed(3);
+  $('stat-z').textContent = smoothZ.toFixed(3);
   $('stat-n').textContent = `${len} bytes`;
+  log(`p=${p.toFixed(4)} (raw ${rawP.toFixed(4)}) · z=${smoothZ.toFixed(3)} (raw ${stoufferZ.toFixed(3)}) · window ${zHistory.length}/${SMOOTH_WINDOW}`);
 
   // record to history and redraw chart
   history.push({ ts: Date.now(), p });
